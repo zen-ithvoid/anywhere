@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1115">
+<title>Anywear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: live try-on stage on top, controls below; two columns from 860px.
+   Look: tailor's bench. Pattern-paper grey, ink text, tape-measure yellow as the only accent. */
+:root {
+  --bg: #E8EBEF; --surface: #F6F7F9; --fg: #12151A; --muted: #5B6470; --line: #C4CAD3;
+  --accent: #F0B90B; --accent-fg: #12151A; --focus: #1B5FD1;
+  --font-display: "Bricolage Grotesque", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E1115; --surface: #171B21; --fg: #ECEEF1; --muted: #98A1AD; --line: #2B323B;
+    --accent: #F5C518; --accent-fg: #12151A; --focus: #7FB0FF; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45;
+  padding-inline: 16px; padding-block: 16px 32px;
+}
+.app { max-width: 1000px; margin-inline: auto; display: grid; gap: 20px; }
+header { display: grid; gap: 8px; }
+.brand { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 2rem; letter-spacing: -0.03em; line-height: 1; margin: 0; }
+.tag { color: var(--muted); font-size: 0.9rem; margin: 0; }
+.tape {
+  height: 12px; border-top: 2px solid var(--accent);
+  background: repeating-linear-gradient(90deg, var(--fg) 0 1px, transparent 1px 8px);
+  background-size: 100% 6px; background-repeat: no-repeat; opacity: .55;
+}
+.stage-wrap { position: relative; width: 100%; max-width: 480px; margin-inline: auto; min-width: 0; }
+canvas {
+  display: block; width: 100%; height: auto; aspect-ratio: 3 / 4; max-width: 100%;
+  border-radius: 6px; touch-action: none; cursor: grab; background: #D5D9DF;
+}
+.status {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; text-align: center;
+  background: var(--fg); color: var(--bg); font-size: 0.85rem; padding: 8px 12px; border-radius: 8px; pointer-events: none;
+}
+.status[hidden] { display: none; }
+.panel { display: grid; gap: 22px; min-width: 0; align-content: start; }
+.group { display: grid; gap: 10px; min-width: 0; }
+.label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn {
+  appearance: none; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; padding: 10px 16px; border-radius: 8px;
+  border: 1.5px solid var(--fg); background: transparent; color: var(--fg);
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+}
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.vh { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.vh:focus-visible + label.btn, .btn:focus-visible, .chip:focus-visible, .sw:focus-visible, input[type=range]:focus-visible {
+  outline: 3px solid var(--focus); outline-offset: 2px;
+}
+.note { color: var(--muted); font-size: 0.85rem; margin: 0; max-width: 60ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  appearance: none; font: inherit; font-weight: 500; cursor: pointer; min-height: 44px; padding: 8px 16px;
+  border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--fg);
+}
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.sw { appearance: none; width: 44px; height: 44px; border-radius: 50%; cursor: pointer; padding: 0; border: 2px solid var(--surface); box-shadow: 0 0 0 1.5px var(--line); }
+.sw[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--fg); }
+.slider { display: grid; gap: 4px; }
+.slider .row { display: flex; justify-content: space-between; align-items: baseline; }
+.slider label { font-weight: 500; }
+output { font-family: var(--font-mono); font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; margin: 0; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; max-width: calc(100% - 32px); z-index: 5;
+}
+.toast[hidden] { display: none; }
+#cam { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+@media (min-width: 860px) {
+  .app { grid-template-columns: minmax(0, 480px) minmax(0, 1fr); column-gap: 48px; align-items: start; }
+  header { grid-column: 1 / -1; }
+  .stage-wrap { margin-inline: 0; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>Anywear</h1>
+      <p class="tag">Kapde pehle try karo, phir kharido.</p>
+    </div>
+    <div class="tape" aria-hidden="true"></div>
+  </header>
+
+  <div class="stage-wrap">
+    <canvas id="stage" width="1200" height="1600" aria-label="Try-on stage"></canvas>
+    <div class="status" id="status" role="status" aria-live="polite" hidden></div>
+    <video id="cam" playsinline muted></video>
+  </div>
+
+  <div class="panel">
+    <div class="group">
+      <p class="label">Live camera</p>
+      <div class="btns">
+        <button class="btn primary" id="start" type="button">Start live camera</button>
+        <button class="btn" id="flip" type="button" disabled>Flip camera</button>
+        <button class="btn" id="stop" type="button" disabled>Stop</button>
+      </div>
+      <p class="note">Stand back so your shoulders and hips are in the frame. The outfit follows your body. Your video stays on your phone and is never uploaded.</p>
+    </div>
+
+    <div class="group">
+      <p class="label">Or use a photo</p>
+      <div class="btns">
+        <input class="vh" id="selfie" type="file" accept="image/*" capture="user">
+        <label class="btn" for="selfie">Take a selfie</label>
+        <input class="vh" id="pick" type="file" accept="image/*">
+        <label class="btn" for="pick">Choose a photo</label>
+        <button class="btn" id="mannequin" type="button">Use mannequin</button>
+      </div>
+      <p class="note">With a photo or the mannequin, drag the outfit with one finger and pinch with two to resize and tilt it.</p>
+    </div>
+
+    <div class="group">
+      <p class="label">Outfit</p>
+      <div class="chips" id="garments" role="group" aria-label="Outfit type"></div>
+    </div>
+
+    <div class="group">
+      <p class="label">Colour</p>
+      <div class="swatches" id="swatches" role="group" aria-label="Colour"></div>
+    </div>
+
+    <div class="group">
+      <p class="label">Fine tune</p>
+      <div class="slider">
+        <div class="row"><label for="size">Size</label><output id="sizeOut">100%</output></div>
+        <input id="size" type="range" min="0.5" max="1.7" step="0.01" value="1">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="wid">Width</label><output id="widOut">100%</output></div>
+        <input id="wid" type="range" min="0.8" max="1.35" step="0.01" value="1">
+      </div>
+      <div class="slider">
+        <div class="row"><label for="rot">Tilt</label><output id="rotOut">0°</output></div>
+        <input id="rot" type="range" min="-30" max="30" step="1" value="0">
+      </div>
+    </div>
+
+    <div class="btns">
+      <button class="btn primary" id="save" type="button">Save look</button>
+      <button class="btn" id="reset" type="button">Reset fit</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script type="module">
+const TASKS = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const MODEL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+
+const W = 600, H = 800, S = 2;
+const $ = (id) => document.getElementById(id);
+const cv = $('stage'), ctx = cv.getContext('2d'), video = $('cam');
+
+const COLORS = [['Ink','#1D232B'],['Indigo','#2F4B7C'],['Brick','#A8432F'],['Olive','#6B7A3A'],['Mustard','#D49A1E'],['Teal','#1F7A7A'],['Rose','#C86B85'],['Off-white','#ECE7DD']];
+const g = { type: 'tee', color: '#2F4B7C', x: 300, y: 240, scale: 1, wid: 1, rot: 0 };
+let mode = 'mannequin';          // 'live' | 'photo' | 'mannequin'
+let photo = null, stream = null, landmarker = null, facing = 'user', lastVT = -1, exportFlag = false;
+const auto = { ok: false, x: 300, y: 240, sx: 1, sy: 1, r: 0 };
+
+const P = (d) => new Path2D(d);
+function shade(hex, f) {
+  const n = parseInt(hex.slice(1), 16); let r = n >> 16, gg = (n >> 8) & 255, b = n & 255;
+  const t = f < 0 ? 0 : 255, a = Math.abs(f);
+  r = Math.round(r + (t - r) * a); gg = Math.round(gg + (t - gg) * a); b = Math.round(b + (t - b) * a);
+  return `rgb(${r},${gg},${b})`;
+}
+const FOLDS = [[-60,140,-20,300,-50,220],[40,150,70,310,60,230],[-100,115,-60,170,-90,140],[90,130,110,200,108,160]];
+function fabric(c, path, col, noShadow) {
+  c.save();
+  if (!noShadow) { c.shadowColor = 'rgba(0,0,0,.28)'; c.shadowBlur = 16; c.shadowOffsetY = 6; }
+  c.fillStyle = col; c.fill(path); c.restore();
+  c.save(); c.clip(path);
+  const gr = c.createLinearGradient(-190, 0, 190, 0);
+  gr.addColorStop(0, 'rgba(255,255,255,.16)'); gr.addColorStop(0.45, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,.22)');
+  c.fillStyle = gr; c.fillRect(-260, -120, 520, 760);
+  c.strokeStyle = 'rgba(0,0,0,.09)'; c.lineWidth = 3; c.lineCap = 'round';
+  FOLDS.forEach((f) => { c.beginPath(); c.moveTo(f[0], f[1]); c.quadraticCurveTo(f[4], f[5], f[2], f[3]); c.stroke(); });
+  c.restore();
+  c.lineJoin = 'round'; c.lineWidth = 2; c.strokeStyle = shade(col, -0.35); c.stroke(path);
+}
+function line(c, d, color, w) { c.save(); c.strokeStyle = color; c.lineWidth = w; c.lineCap = 'round'; c.stroke(P(d)); c.restore(); }
+function dot(c, x, y, r, color) { c.save(); c.fillStyle = color; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); c.restore(); }
+
+const PATHS = {
+  tee: P('M-45 0 L-130 25 L-178 112 L-142 132 L-104 106 L-100 330 L100 330 L104 106 L142 132 L178 112 L130 25 L45 0 Q0 38 -45 0Z'),
+  kurta: P('M-42 0 L-128 24 L-190 190 L-154 206 L-108 112 L-118 520 L118 520 L108 112 L154 206 L190 190 L128 24 L42 0 Q0 30 -42 0Z'),
+  hood: P('M-72 -8 Q-84 -78 0 -82 Q84 -78 72 -8 Q0 44 -72 -8Z'),
+  hoodie: P('M-45 0 L-130 26 L-186 230 L-146 244 L-106 120 L-104 340 L104 340 L106 120 L146 244 L186 230 L130 26 L45 0 Q0 34 -45 0Z'),
+  dress: P('M-40 0 L-96 16 L-102 104 Q-72 132 -62 192 L-152 490 L152 490 L62 192 Q72 132 102 104 L96 16 L40 0 Q0 42 -40 0Z'),
+  blazer: P('M-48 -4 L-134 24 L-188 240 L-148 254 L-108 120 L-112 380 L112 380 L108 120 L148 254 L188 240 L134 24 L48 -4Z')
+};
+const DRAW = {
+  tee(c, col) { fabric(c, PATHS.tee, col); line(c, 'M-45 0 Q0 38 45 0', shade(col, -0.25), 7); line(c, 'M-100 314 L100 314', 'rgba(0,0,0,.18)', 2); },
+  kurta(c, col) {
+    fabric(c, PATHS.kurta, col); line(c, 'M-42 0 Q0 30 42 0', shade(col, -0.25), 7); line(c, 'M0 28 L0 175', shade(col, 0.25), 3);
+    [60, 100, 140].forEach((y) => dot(c, 0, y, 4, shade(col, 0.45)));
+    line(c, 'M-117 430 L-117 520', 'rgba(0,0,0,.28)', 2); line(c, 'M117 430 L117 520', 'rgba(0,0,0,.28)', 2); line(c, 'M-114 506 L114 506', shade(col, 0.3), 3);
+  },
+  hoodie(c, col) {
+    fabric(c, PATHS.hood, shade(col, -0.22)); fabric(c, PATHS.hoodie, col, true);
+    c.save(); c.fillStyle = shade(col, -0.6); c.fill(P('M-45 0 Q0 38 45 0 Q0 -22 -45 0Z')); c.restore();
+    line(c, 'M-70 232 L70 232 L84 304 L-84 304Z', 'rgba(0,0,0,.3)', 2);
+    line(c, 'M-18 30 L-20 112', shade(col, 0.5), 3); line(c, 'M18 30 L20 112', shade(col, 0.5), 3);
+    c.save(); c.fillStyle = shade(col, -0.18); c.fill(P('M-104 318 L104 318 L104 340 L-104 340Z')); c.restore();
+    line(c, 'M-184 232 L-148 244', shade(col, -0.25), 10); line(c, 'M184 232 L148 244', shade(col, -0.25), 10);
+  },
+  dress(c, col) {
+    fabric(c, PATHS.dress, col);
+    c.save(); c.fillStyle = shade(col, -0.2); c.fill(P('M-62 184 L62 184 L64 206 L-64 206Z')); c.restore();
+    [-52, -18, 18, 52].forEach((x) => line(c, 'M' + (x * 0.55) + ' 208 L' + (x * 1.5) + ' 488', 'rgba(0,0,0,.1)', 2));
+    line(c, 'M-40 0 Q0 42 40 0', shade(col, -0.25), 6);
+  },
+  blazer(c, col) {
+    fabric(c, PATHS.blazer, col);
+    c.save(); c.fillStyle = '#E9EAEE'; c.fill(P('M-48 -4 L48 -4 L0 170Z')); c.restore();
+    [P('M-48 -4 L-86 34 L-52 112 L-2 168Z'), P('M48 -4 L86 34 L52 112 L2 168Z')].forEach((p) => {
+      c.save(); c.fillStyle = shade(col, 0.1); c.fill(p); c.lineJoin = 'round'; c.lineWidth = 2; c.strokeStyle = shade(col, -0.35); c.stroke(p); c.restore();
+    });
+    line(c, 'M0 168 L0 380', 'rgba(0,0,0,.3)', 2); dot(c, -7, 230, 5, shade(col, -0.5)); dot(c, -7, 290, 5, shade(col, -0.5));
+    line(c, 'M-92 300 L-44 296', 'rgba(0,0,0,.3)', 2); line(c, 'M92 300 L44 296', 'rgba(0,0,0,.3)', 2);
+  }
+};
+const LABELS = { tee: 'Tee', kurta: 'Kurta', hoodie: 'Hoodie', dress: 'Dress', blazer: 'Blazer' };
+
+function renderGarment(x, y, sx, sy, rotRad) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rotRad); ctx.scale(sx, sy); DRAW[g.type](ctx, g.color); ctx.restore();
+}
+
+function scene() {
+  const bg = ctx.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, '#E4E7EB'); bg.addColorStop(1, '#C6CBD3');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(0,0,0,.09)'; ctx.beginPath(); ctx.ellipse(300, 792, 170, 14, 0, 0, 6.2832); ctx.fill();
+  const body = ctx.createLinearGradient(130, 0, 470, 0);
+  body.addColorStop(0, '#CFC8C1'); body.addColorStop(0.5, '#BEB7B0'); body.addColorStop(1, '#A59E97');
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.arc(300, 150, 48, 0, 6.2832); ctx.fill(); ctx.fillRect(282, 190, 36, 60);
+  ctx.fill(P('M170 262 Q175 240 215 236 L385 236 Q425 240 430 262 L420 520 L180 520Z'));
+  ctx.fill(P('M172 262 L126 486 L152 496 L198 304Z')); ctx.fill(P('M428 262 L474 486 L448 496 L402 304Z'));
+  ctx.fill(P('M200 500 L292 500 L284 792 L228 792Z')); ctx.fill(P('M308 500 L400 500 L372 792 L316 792Z'));
+}
+function drawPhoto() {
+  const iw = photo.naturalWidth, ih = photo.naturalHeight, s = Math.max(W / iw, H / ih), dw = iw * s, dh = ih * s;
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); ctx.drawImage(photo, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+// ---- Live camera and body tracking ----
+const mirror = () => facing === 'user';
+function videoGeom() {
+  const vw = video.videoWidth || 1, vh = video.videoHeight || 1, s = Math.max(W / vw, H / vh), dw = vw * s, dh = vh * s;
+  return { dw, dh, ox: (W - dw) / 2, oy: (H - dh) / 2 };
+}
+function drawVideo() {
+  const q = videoGeom(); ctx.save();
+  if (mirror()) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+  ctx.drawImage(video, q.ox, q.oy, q.dw, q.dh); ctx.restore();
+}
+function mapPt(l, q) { const px = q.ox + l.x * q.dw; return { x: mirror() ? W - px : px, y: q.oy + l.y * q.dh }; }
+const seen = (l) => l && (l.visibility === undefined || l.visibility > 0.4);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function updateAuto(res) {
+  const lm = res && res.landmarks && res.landmarks[0];
+  if (!lm || !seen(lm[11]) || !seen(lm[12])) { auto.ok = false; setStatus('Step back until your shoulders are in the frame.'); return; }
+  setStatus('');
+  const q = videoGeom();
+  let a = mapPt(lm[11], q), b = mapPt(lm[12], q);
+  if (a.x > b.x) { const t = a; a = b; b = t; }
+  const sw = Math.hypot(b.x - a.x, b.y - a.y) || 1, mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const r = Math.atan2(b.y - a.y, b.x - a.x);
+  const sx = (sw * 1.15) / 260;
+  let sy = sx;
+  if (seen(lm[23]) && seen(lm[24])) {
+    const h1 = mapPt(lm[23], q), h2 = mapPt(lm[24], q);
+    const torso = Math.hypot((h1.x + h2.x) / 2 - mid.x, (h1.y + h2.y) / 2 - mid.y);
+    sy = clamp(torso / 290, sx * 0.75, sx * 1.5);
+  }
+  const nx = mid.x + 30 * sy * Math.sin(r), ny = mid.y - 30 * sy * Math.cos(r);
+  const k = auto.ok ? 0.4 : 1;
+  auto.x += (nx - auto.x) * k; auto.y += (ny - auto.y) * k; auto.sx += (sx - auto.sx) * k; auto.sy += (sy - auto.sy) * k; auto.r += (r - auto.r) * k;
+  auto.ok = true;
+}
+
+async function loadLandmarker() {
+  const { PoseLandmarker, FilesetResolver } = await import(TASKS + '/vision_bundle.mjs');
+  const fs = await FilesetResolver.forVisionTasks(TASKS + '/wasm');
+  const make = (delegate) => PoseLandmarker.createFromOptions(fs, { baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: 'VIDEO', numPoses: 1 });
+  try { return await make('GPU'); } catch (e) { return await make('CPU'); }
+}
+function stopStream() { if (stream) { stream.getTracks().forEach((t) => t.stop()); stream = null; } video.srcObject = null; }
+async function openCamera() {
+  stopStream();
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+  video.srcObject = stream; await video.play();
+}
+async function startLive() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setStatus('Camera needs a secure (https) link. Open the GitHub Pages link, not a saved file.', 6000); return; }
+  setStatus('Starting camera...');
+  try { await openCamera(); }
+  catch (e) { setStatus('Camera is blocked. Allow camera for this site in your browser settings, then try again.', 7000); return; }
+  mode = 'live'; photo = null; auto.ok = false; $('flip').disabled = false; $('stop').disabled = false;
+  if (!landmarker) {
+    setStatus('Loading body tracker...');
+    try { landmarker = await loadLandmarker(); }
+    catch (e) { setStatus('Body tracker could not load. Check your internet and press Start again.', 7000); mode = 'mannequin'; stopStream(); $('flip').disabled = true; $('stop').disabled = true; return; }
+  }
+  setStatus('');
+}
+function stopLive() { stopStream(); mode = photo ? 'photo' : 'mannequin'; $('flip').disabled = true; $('stop').disabled = true; setStatus(''); }
+$('start').addEventListener('click', startLive);
+$('stop').addEventListener('click', stopLive);
+$('flip').addEventListener('click', async () => {
+  facing = facing === 'user' ? 'environment' : 'user'; auto.ok = false;
+  try { await openCamera(); } catch (e) { facing = facing === 'user' ? 'environment' : 'user'; setStatus('That camera could not be opened.', 4000); }
+});
+
+// ---- Frame loop ----
+function frame() {
+  requestAnimationFrame(frame);
+  ctx.setTransform(S, 0, 0, S, 0, 0);
+  if (mode === 'live' && video.readyState >= 2) {
+    drawVideo();
+    if (landmarker && video.currentTime !== lastVT) {
+      lastVT = video.currentTime;
+      try { updateAuto(landmarker.detectForVideo(video, performance.now())); } catch (e) {}
+    }
+    if (auto.ok) renderGarment(auto.x, auto.y, auto.sx * g.scale * g.wid, auto.sy * g.scale, auto.r + g.rot * Math.PI / 180);
+  } else {
+    if (mode === 'photo' && photo) drawPhoto(); else scene();
+    renderGarment(g.x, g.y, g.scale * g.wid, g.scale, g.rot * Math.PI / 180);
+  }
+  if (exportFlag) {
+    ctx.save(); ctx.font = '600 15px "Bricolage Grotesque", Arial, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,.9)';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 4; ctx.fillText('anywear', 16, H - 16); ctx.restore();
+  }
+}
+
+// ---- Controls ----
+const gWrap = $('garments'), sWrap = $('swatches');
+Object.keys(LABELS).forEach((k) => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = LABELS[k]; b.dataset.k = k;
+  b.setAttribute('aria-pressed', k === g.type ? 'true' : 'false');
+  b.addEventListener('click', () => { g.type = k; [...gWrap.children].forEach((c) => c.setAttribute('aria-pressed', c.dataset.k === k ? 'true' : 'false')); });
+  gWrap.appendChild(b);
+});
+COLORS.forEach(([name, hex]) => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = hex; b.dataset.c = hex;
+  b.setAttribute('aria-label', name); b.setAttribute('aria-pressed', hex === g.color ? 'true' : 'false');
+  b.addEventListener('click', () => { g.color = hex; [...sWrap.children].forEach((x) => x.setAttribute('aria-pressed', x.dataset.c === hex ? 'true' : 'false')); });
+  sWrap.appendChild(b);
+});
+const sizeEl = $('size'), widEl = $('wid'), rotEl = $('rot');
+function sync() {
+  sizeEl.value = g.scale; widEl.value = g.wid; rotEl.value = Math.round(g.rot);
+  $('sizeOut').textContent = Math.round(g.scale * 100) + '%'; $('widOut').textContent = Math.round(g.wid * 100) + '%'; $('rotOut').textContent = Math.round(g.rot) + '°';
+}
+sizeEl.addEventListener('input', () => { g.scale = parseFloat(sizeEl.value); sync(); });
+widEl.addEventListener('input', () => { g.wid = parseFloat(widEl.value); sync(); });
+rotEl.addEventListener('input', () => { g.rot = parseFloat(rotEl.value); sync(); });
+
+// Drag and pinch (photo and mannequin only)
+const pts = new Map(); let snapState = null;
+function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+function snap() {
+  const a = [...pts.values()];
+  snapState = a.length === 2 ? { d: Math.hypot(a[1].x - a[0].x, a[1].y - a[0].y) || 1, a: Math.atan2(a[1].y - a[0].y, a[1].x - a[0].x), mx: (a[0].x + a[1].x) / 2, my: (a[0].y + a[1].y) / 2, s: g.scale, r: g.rot, x: g.x, y: g.y } : null;
+}
+cv.addEventListener('pointerdown', (e) => { if (mode === 'live') return; try { cv.setPointerCapture(e.pointerId); } catch (x) {} pts.set(e.pointerId, pos(e)); snap(); });
+cv.addEventListener('pointermove', (e) => {
+  if (mode === 'live' || !pts.has(e.pointerId)) return;
+  const p = pos(e), prev = pts.get(e.pointerId); pts.set(e.pointerId, p);
+  if (pts.size === 1) { g.x = clamp(g.x + p.x - prev.x, -100, W + 100); g.y = clamp(g.y + p.y - prev.y, -100, H + 100); }
+  else if (pts.size === 2 && snapState) {
+    const a = [...pts.values()], dx = a[1].x - a[0].x, dy = a[1].y - a[0].y;
+    g.scale = clamp(snapState.s * Math.hypot(dx, dy) / snapState.d, 0.5, 1.7);
+    g.rot = clamp(snapState.r + (Math.atan2(dy, dx) - snapState.a) * 180 / Math.PI, -30, 30);
+    g.x = snapState.x + ((a[0].x + a[1].x) / 2 - snapState.mx); g.y = snapState.y + ((a[0].y + a[1].y) / 2 - snapState.my);
+  }
+  sync();
+});
+const endPtr = (e) => { pts.delete(e.pointerId); snap(); };
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+
+// Photo source
+function loadFile(f) {
+  if (!f) return;
+  const im = new Image();
+  im.onload = () => { if (mode === 'live') stopLive(); photo = im; mode = 'photo'; Object.assign(g, { x: 300, y: 330, scale: 1, wid: 1, rot: 0 }); sync(); setStatus('Photo added. Drag the outfit onto your shoulders.', 4000); };
+  im.onerror = () => setStatus('That file could not be opened as a photo. Try a JPG or PNG.', 4000);
+  im.src = URL.createObjectURL(f);
+}
+$('selfie').addEventListener('change', (e) => { loadFile(e.target.files[0]); e.target.value = ''; });
+$('pick').addEventListener('change', (e) => { loadFile(e.target.files[0]); e.target.value = ''; });
+$('mannequin').addEventListener('click', () => { if (mode === 'live') stopLive(); photo = null; mode = 'mannequin'; Object.assign(g, { x: 300, y: 240 }); sync(); });
+$('reset').addEventListener('click', () => { Object.assign(g, { scale: 1, wid: 1, rot: 0, x: 300, y: mode === 'photo' ? 330 : 240 }); sync(); });
+
+// Status and toast
+let stT;
+function setStatus(msg, ms) {
+  const s = $('status'); clearTimeout(stT);
+  if (!msg) { s.hidden = true; return; }
+  s.textContent = msg; s.hidden = false;
+  if (ms) stT = setTimeout(() => { s.hidden = true; }, ms);
+}
+let tT;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tT); tT = setTimeout(() => { t.hidden = true; }, 3200); }
+
+// Save
+$('save').addEventListener('click', () => {
+  exportFlag = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    cv.toBlob((blob) => {
+      exportFlag = false;
+      if (!blob) { toast('Could not make the image. Try again.'); return; }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'anywear-look.png';
+      document.body.appendChild(a); a.click(); a.remove(); toast('Look saved to your downloads.');
+    }, 'image/png');
+  }));
+});
+
+sync(); frame();
+</script>
+</body>
+</html>
